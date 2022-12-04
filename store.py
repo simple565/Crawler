@@ -1,6 +1,27 @@
 import sqlite3
 
 
+class CategoryTable:
+    TABLE_NAME = 'category'
+    NAME = 'CategoryName'
+    PARENT_CAT_NAME = 'ParentCategoryName'
+    STORE = 'Store'
+    URL = 'Url'
+
+    @staticmethod
+    def gen_create_table_sql(table_name):
+        return """CREATE TABLE IF NOT EXISTS %s 
+                        (_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                        %s TEXT,
+                        %s TEXT,
+                        %s TEXT,
+                        %s TEXT)
+                        """ % (table_name,
+                               CategoryTable.NAME,
+                               CategoryTable.PARENT_CAT_NAME,
+                               CategoryTable.STORE,
+                               CategoryTable.URL)
+
 class AppInfoTable:
     TABLE_NAME = 'app'
     APP_NAME = 'AppName'
@@ -24,6 +45,7 @@ class AppInfoTable:
                     %s TEXT,
                     %s TEXT,
                     %s TEXT,
+                    %s TEXT,
                     %s TEXT )
                     """ % (table_name,
                            AppInfoTable.APP_NAME,
@@ -32,6 +54,7 @@ class AppInfoTable:
                            AppInfoTable.APP_TAG,
                            AppInfoTable.APP_STORE,
                            AppInfoTable.APP_ICON_URL,
+                           AppInfoTable.APP_DETAIL_URL,
                            AppInfoTable.COMPANY,
                            AppInfoTable.DOWNLOAD_COUNT
                            )

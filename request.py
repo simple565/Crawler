@@ -25,7 +25,11 @@ class Request:
         if response:
             print('get response form cache')
         else:
-            response = requests.get(url, headers=self.headers, verify=False)
+            try:
+                response = requests.get(url, headers=self.headers, verify=False)
+            except Exception as e:
+                print(e)
+                return None
 
         if response.status_code not in range(200, 209):
             print('request error')
