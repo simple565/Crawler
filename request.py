@@ -40,10 +40,3 @@ class Request:
         return response
 
 
-    def download_image(self, url, dir_path, img_name):
-        img_path = dir_path + img_name
-        request_img = self.do_request(url)
-        with open(img_path, 'wb') as f:
-            f.write(request_img.content)
-
-

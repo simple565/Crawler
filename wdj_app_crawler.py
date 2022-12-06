@@ -1,10 +1,12 @@
 import json
+import os
 import re
 
 import pandas as pd
 from bs4 import BeautifulSoup
 
 import store
+from img_tool import ImageOperation
 from request import Request
 from store import AppInfoTable
 from store import CategoryTable
@@ -17,10 +19,11 @@ WDJ_BASE_URL = 'https://www.wandoujia.com'
 
 # 存储应用分类信息
 def save_category_info(category_list):
-    sql = """INSERT INTO 'category' ('CategoryName', 'ParentCategoryName', 'Store', 'Url') VALUES (?,?,?,?)"""
+    sql = """INSERT OR IGNORE INTO 'category' ('CategoryName', 'ParentCategoryName', 'Store', 'Url') VALUES (?,?,?,?)"""
     create_result = db_helper.create_tabel(CategoryTable.gen_create_table_sql(CategoryTable.TABLE_NAME))
     print(create_result)
     db_helper.insert_table_many(sql=sql, value=category_list)
+
 
 # 存储应用信息
 def save_app_info(app_list):
@@ -57,6 +60,8 @@ def parse_category_url(category_lis):
 
     return category_lis
 
+
+# 获取分类信息
 def parse_category_info(soup, parent_category_name):
     print(soup)
     name = soup.get('title')
@@ -69,6 +74,7 @@ def parse_category_info(soup, parent_category_name):
     }
 
     return category
+
 
 # 获取应用信息
 def parse_page_app_info_list(category_name, sub_category_name, soup):
@@ -87,7 +93,6 @@ def parse_page_app_info_list(category_name, sub_category_name, soup):
         # print(download_num)
         # app_size = li.find(name='span', attrs={"title": re.compile('\d+MB')}).text
         # print(app_size)
-        # download_app_icon(app_name, app_package_name, icon_url)
         app = {
             AppInfoTable.APP_NAME: app_name,
             AppInfoTable.APP_PACKAGE_NAME: app_package_name,
@@ -101,7 +106,7 @@ def parse_page_app_info_list(category_name, sub_category_name, soup):
         }
         if category_name == '':
             app[AppInfoTable.APP_CATEGORY] = li.find(name='a', class_="tag-link").text
-            print(app[AppInfoTable.APP_CATEGORY])
+            # print(app[AppInfoTable.APP_CATEGORY])
         page_app_list.append(app)
 
     return page_app_list
@@ -157,11 +162,10 @@ def get_wdj_category_app_list(app_category_lis):
 
 # 获取豌豆荚排行榜下应用列表 https://www.wandoujia.com/wdjweb/api/top/more?resourceType=0&page=1
 # resourceType=0 软件排行榜 resourceType=1 游戏排行榜
-def get_wdj_rank_top_list():
+def get_wdj_rank_top_list(resource_type=0):
     rank_app_list = []
     rank_url = WDJ_BASE_URL + '/wdjweb/api/top/more?resourceType={}&page={}'
     max_page_index = 999
-    resource_type = 0
     for page in range(1, max_page_index):
         url = rank_url.format(resource_type, page)
         print(url)
@@ -180,8 +184,43 @@ def get_wdj_rank_top_list():
     return rank_app_list
 
 
+# 下载图片到本地目录
+def download_icon():
+    app_list = []
+    fetch_sql = 'SELECT * FROM app'
+    raws = db_helper.fetchall_table(fetch_sql)
+    print(len(raws))
+    for raw in raws:
+        app_value = {
+            AppInfoTable.APP_NAME: raw[1],
+            AppInfoTable.APP_PACKAGE_NAME: raw[2],
+            AppInfoTable.APP_CATEGORY: raw[3],
+            AppInfoTable.APP_TAG: raw[4],
+            AppInfoTable.APP_STORE: raw[5],
+            AppInfoTable.APP_ICON_URL: raw[6],
+            AppInfoTable.APP_DETAIL_URL: raw[7],
+            AppInfoTable.COMPANY: raw[8],
+            AppInfoTable.DOWNLOAD_COUNT: raw[9]
+        }
+        app_list.append(app_value)
+
+    dir_path = 'Icons/'
+    for app in app_list:
+        pkg_name = app[AppInfoTable.APP_PACKAGE_NAME]
+        url = app[AppInfoTable.APP_ICON_URL]
+        icon_name = pkg_name + '.' + url.split('/')[-1].split('.')[1]
+        print(icon_name)
+        icon_path = dir_path + icon_name
+        # 判断文件是否存在
+        if os.path.isfile(icon_path):
+            print('icon already exist')
+            continue
+        else:
+            ImageOperation.download(request, url, dir_path, icon_name)
+
+
 if __name__ == '__main__':
-    db_helper = store.SqliteStore('/../App.db')
+    db_helper = store.SqliteStore('App.db')
     request = Request(use_cache=True)
     # 应用分类
     wdj_category_list = get_wdj_app_category()
@@ -191,13 +230,14 @@ if __name__ == '__main__':
 
     df_category = pd.DataFrame(wdj_category_list)
     # 应用分类入库
-    # save_category_info(df_category.values.tolist())
+    save_category_info(df_category.values.tolist())
 
     # 分类下应用
-    # apps = get_wdj_category_app_list(wdj_category_list)
+    apps = get_wdj_category_app_list(wdj_category_list)
 
     # 排行榜
-    apps = get_wdj_rank_top_list()
+    apps += get_wdj_rank_top_list(resource_type=0)
+    apps += get_wdj_rank_top_list(resource_type=1)
 
     df_app = pd.DataFrame(apps, columns=[
         AppInfoTable.APP_NAME,
@@ -213,6 +253,4 @@ if __name__ == '__main__':
 
     print(df_app.head())
     save_app_info(df_app.values.tolist())
-
-    # df.to_excel('result_wdj.xlsx')
     db_helper.close_con()

@@ -22,6 +22,7 @@ class CategoryTable:
                                CategoryTable.STORE,
                                CategoryTable.URL)
 
+
 class AppInfoTable:
     TABLE_NAME = 'app'
     APP_NAME = 'AppName'
@@ -127,7 +128,7 @@ class SqliteStore:
         查询所有数据
         :param sql:
         :param limit_flag: 查询条数选择，False 查询一条，True 全部查询
-        :return:
+        :return: [(xxx, xxxx, xxx), (xxx, xxxx, xxx)]
         """
         try:
             self._cur.execute(sql)
@@ -172,7 +173,7 @@ class SqliteStore:
 
 
 if __name__ == '__main__':
-    sqlite_helper = SqliteStore('/../App.db')
+    sqlite_helper = SqliteStore('/../AppInfo.db')
     create_result = sqlite_helper.create_tabel(AppInfoTable.gen_create_table_sql(AppInfoTable.TABLE_NAME))
     print(create_result)
     sqlite_helper.close_con()
