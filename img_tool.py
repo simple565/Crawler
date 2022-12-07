@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 
 from PIL import Image
 
@@ -49,6 +50,16 @@ class ImageOperation:
         except:
             print(f'Error: {path} failed!')
             return False
+
+        def copy_file(src_file, dst_path):
+            if not os.path.isfile(src_file):
+                print(f"{src_file} not exist!")
+            else:
+                f_path, f_name = os.path.split(src_file)  # 分离文件名和路径
+                if not os.path.exists(dst_path):
+                    os.makedirs(dst_path)  # 创建路径
+                shutil.copy(src_file, dst_path + f_name)  # 复制文件
+                print("copy %s -> %s" % (src_file, dst_path + f_name))
 
 
 if __name__ == '__main__':
