@@ -4,9 +4,8 @@ import shutil
 import store
 from img_tool import ImageOperation
 from request import Request
-from store import CategoryTable
 from store import AppInfoTable
-from xm_app_crawler import XiaoMiAppStoreCrawler
+from store import CategoryTable
 
 
 # 下载图片到本地目录
@@ -102,37 +101,8 @@ def save_app_info(store_helper, app_list):
     store_helper.insert_table_many(sql=sql, value=app_list)
 
 
-def update_db():
-    input_db_helper = store.SqliteStore('AppInfo.db')
-    # AppWhitelist AppWhiteList
-    output_db_helper = store.SqliteStore('App.db')
-
-    fetch_sql = "SELECT PackageName, Company FROM app WHERE Company != ''"
-    raws = input_db_helper.fetchall_table(fetch_sql)
-    print(len(raws))
-    apps = []
-    for raw in raws:
-        apps.append({
-            AppInfoTable.APP_PACKAGE_NAME: raw[0],
-            AppInfoTable.COMPANY: raw[1]
-        })
-
-    update_rows = 0
-    for app in apps:
-        update_sql = "UPDATE app SET Company='{}' WHERE PackageName='{}'".format(app[AppInfoTable.COMPANY], app[AppInfoTable.APP_PACKAGE_NAME])
-        print(update_sql)
-        insert_result = output_db_helper.insert_update_table(update_sql)
-        if insert_result:
-            update_rows += 1
-
-    print(update_rows)
-    input_db_helper.close_con()
-    output_db_helper.close_con()
-
-
 if __name__ == '__main__':
     db_helper = store.SqliteStore('App.db')
     request = Request(use_cache=True)
-    total_app_list = []
-    xm_app_list = XiaoMiAppStoreCrawler(request=request).get_app_list()
-    total_app_list += xm_app_list
+    download_icon()
+    filter_hot_app_icon()

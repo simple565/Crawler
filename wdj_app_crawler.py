@@ -1,4 +1,5 @@
 import json
+import os
 import re
 
 import pandas as pd
@@ -6,6 +7,7 @@ from bs4 import BeautifulSoup
 
 import store
 from app_store_crawler import save_app_info, save_category_info
+from img_tool import ImageOperation
 from request import Request
 from store import AppInfoTable
 from store import CategoryTable
@@ -15,6 +17,7 @@ WDJ_STORE_NAME = 'WDJ'
 # 应用商店基本URL
 WDJ_BASE_URL = 'https://www.wandoujia.com'
 MAX_PAGE_INDEX = 999
+
 
 class WdjStoreCrawler:
 
@@ -89,6 +92,61 @@ class WdjStoreCrawler:
 
         return page_app_list
 
+    # 获取搜索结果应用列表信息
+    def parse_search_list(self, soup):
+        search_list = []
+        li_list = soup.find_all(name='li', class_='search-item search-searchitems')
+        for li in li_list:
+            app_name = li.find(name='a', class_="name").text
+            # print(app_name)
+            app_package_name = li.find(name='a', class_='detail-check-btn').get('data-app-pname')
+            # print(app_package_name)
+            detail_url = li.find(name='a', class_="name").attrs.get('href')
+            # print(detail_url)
+            icon_url = li.find(name='img').get('src')
+            # print(icon_url)
+            download_num = ''
+            # print(download_num)
+            app = {
+                AppInfoTable.APP_NAME: app_name,
+                AppInfoTable.APP_PACKAGE_NAME: app_package_name,
+                AppInfoTable.APP_CATEGORY: '',
+                AppInfoTable.APP_TAG: '',
+                AppInfoTable.APP_STORE: WDJ_STORE_NAME,
+                AppInfoTable.APP_ICON_URL: icon_url,
+                AppInfoTable.APP_DETAIL_URL: detail_url,
+                AppInfoTable.COMPANY: '',
+                AppInfoTable.DOWNLOAD_COUNT: download_num
+            }
+            search_list.append(app)
+
+        return search_list
+
+    # 获取详情页应用信息
+    def parse_detail_info(self, soup):
+        app_name = soup.find(name='span', class_="title", itemprop='name').text
+        print(app_name)
+        app_package_name = soup.find('body').get('data-pn')
+        print(app_package_name)
+        company = soup.find(class_='dev-sites', itemprop='name').text
+        print(company)
+        download_num = soup.find(name='span', class_='item install').find(name='i').text
+        print(download_num)
+        category_name = soup.find(name='a', itemprop='SoftwareApplicationCategory').text
+        print(category_name)
+        app = {
+            AppInfoTable.APP_NAME: app_name,
+            AppInfoTable.APP_PACKAGE_NAME: app_package_name,
+            AppInfoTable.APP_CATEGORY: category_name,
+            AppInfoTable.APP_TAG: '',
+            AppInfoTable.APP_STORE: WDJ_STORE_NAME,
+            AppInfoTable.APP_ICON_URL: '',
+            AppInfoTable.APP_DETAIL_URL: '',
+            AppInfoTable.COMPANY: company,
+            AppInfoTable.DOWNLOAD_COUNT: download_num
+        }
+        return app
+
     # 获取豌豆荚应用分类 https://www.wandoujia.com/category/app
     def get_wdj_app_category(self):
         wdj_app_category_list = []
@@ -160,16 +218,27 @@ class WdjStoreCrawler:
         for keyword in keywords:
             for page_index in range(0, MAX_PAGE_INDEX):
                 url = search_url.format(page_index, keyword)
-                print(url)
                 response = self.request.do_request(url)
                 if response:
                     content = json.loads(response.text)['data']['content']
                     if content == '':
                         break
                     soup = BeautifulSoup(content, features="lxml")
-                    search_result_list += self.parse_page_app_info_list('', '', soup)
+                    search_result_list += self.parse_search_list(soup)
 
         return search_result_list
+
+    def get_wdj_app_detail(self, app_list):
+        detail_list = []
+        for app in app_list:
+            url = app[AppInfoTable.APP_DETAIL_URL]
+            print(url)
+            response = self.request.do_request(url)
+            if response:
+                soup = BeautifulSoup(response.text, features="lxml")
+                detail_list.append(self.parse_detail_info(soup))
+
+        return detail_list
 
 
 if __name__ == '__main__':
@@ -178,19 +247,22 @@ if __name__ == '__main__':
     wdj_crawler = WdjStoreCrawler(request=request, store_helper=db_helper)
 
     # 应用分类
-    wdj_category_list = wdj_crawler.get_wdj_app_category()
-    print(len(wdj_category_list))
+    # wdj_category_list = wdj_crawler.get_wdj_app_category()
+    # print(len(wdj_category_list))
 
-    df_category = pd.DataFrame(wdj_category_list)
+    # df_category = pd.DataFrame(wdj_category_list)
     # 应用分类入库
-    save_category_info(db_helper, df_category.values.tolist())
+    # save_category_info(db_helper, df_category.values.tolist())
 
     # 分类下应用
-    apps = wdj_crawler.get_wdj_category_app_list(wdj_category_list)
+    # apps = wdj_crawler.get_wdj_category_app_list(wdj_category_list)
 
     # 排行榜
-    apps += wdj_crawler.get_wdj_rank_top_list(resource_type=0)
-    apps += wdj_crawler.get_wdj_rank_top_list(resource_type=1)
+    # apps += wdj_crawler.get_wdj_rank_top_list(resource_type=0)
+    # apps += wdj_crawler.get_wdj_rank_top_list(resource_type=1)
+
+    # 搜索补充应用
+    apps = wdj_crawler.search_result_list(['滴滴', '小米运动', 'OneNote', '小翼管家'])
 
     df_app = pd.DataFrame(apps, columns=[
         AppInfoTable.APP_NAME,
@@ -204,6 +276,6 @@ if __name__ == '__main__':
         AppInfoTable.DOWNLOAD_COUNT
     ]).drop_duplicates([AppInfoTable.APP_PACKAGE_NAME])
 
-    print(df_app.head())
+    print(len(df_app))
     save_app_info(db_helper, df_app.values.tolist())
     db_helper.close_con()
